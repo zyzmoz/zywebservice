@@ -44,6 +44,7 @@ type
     procedure AttendConnection(ASocket: TTCPBlockSocket);
     procedure SetHost(AValue: string);
     procedure SetPort(AValue: integer);
+    function Get(URI: string): string;
   protected
     procedure Execute; override;
   published
@@ -61,6 +62,7 @@ procedure Register;
 
 implementation
 
+
 procedure Register;
 begin
   {$I webservice1_icon.lrs}
@@ -71,10 +73,7 @@ end;
 
 procedure TWebServiceThread.AttendConnection(ASocket: TTCPBlockSocket);
 var
-  timeout, I: integer;
-  jsonExp: TSimpleJSONExporter;
-  st: TFileStream;
-  bytes : TBytes;
+  timeout: integer;
   s, res: string;
   method, uri, protocol: string;
   OutputDataString: string;
@@ -122,31 +121,8 @@ begin
     end
     else
     begin
-      jsonExp := TSimpleJSONExporter.Create(nil);
-      for I := 0 to Length(routes) - 1 do
-      begin
-        if (routes[I].path = uri) then
-        begin
-          jsonExp.Dataset := routes[i].query;
-          jsonExp.FileName := 'data.json';
-          try
-            routes[i].query.Open;
-            jsonExp.Execute;
-            st := TFileStream.Create('data.json', fmOpenRead or fmShareDenyWrite);
-            if (st.Size > 0) then
-            begin
-              SetLength(bytes, st.Size);
-              st.Read(bytes[0], st.Size);
-            end;
-            res := TEncoding.ASCII.GetString(bytes);;
-
-          except
-            on E: Exception do
-              res := '{error: "' + e.Message + '"}';
-          end;
-          break;
-        end;
-      end;
+      if (trim(method) = 'get') then
+        res := Get(uri);
       OutputDataString := res;
       // Write the headers back to the client
       ASocket.SendString('HTTP/1.0 200' + CRLF);
@@ -246,6 +222,41 @@ begin
   if FPort = AValue then
     Exit;
   FPort := AValue;
+end;
+
+function TWebServiceThread.Get(URI: string): string;
+var
+  I : integer;
+  jsonExp: TSimpleJSONExporter;
+  st: TFileStream;
+  bytes: TBytes;
+begin
+  jsonExp := TSimpleJSONExporter.Create(nil);
+  for I := 0 to Length(routes) - 1 do
+  begin
+    if (routes[I].path = uri) then
+    begin
+      jsonExp.Dataset := routes[i].query;
+      jsonExp.FileName := 'data.json';
+      try
+        routes[i].query.Open;
+        jsonExp.Execute;
+        st := TFileStream.Create('data.json', fmOpenRead or fmShareDenyWrite);
+        if (st.Size > 0) then
+        begin
+          SetLength(bytes, st.Size);
+          st.Read(bytes[0], st.Size);
+        end;
+         Result := TEncoding.ASCII.GetString(bytes);
+
+
+      except
+        on E: Exception do
+          Result := '{error: "' + e.Message + '"}';
+      end;
+      break;
+    end;
+  end;
 end;
 
 constructor TWebService.Create(AOwner: TComponent);
