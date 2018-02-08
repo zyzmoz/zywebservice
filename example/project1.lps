@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectSession>
+    <PathDelim Value="\"/>
+    <Version Value="10"/>
+    <BuildModes Active="Debug"/>
+    <Units Count="3">
+      <Unit0>
+        <Filename Value="project1.lpr"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="-1"/>
+        <WindowIndex Value="-1"/>
+        <TopLine Value="-1"/>
+        <CursorPos X="-1" Y="-1"/>
+        <UsageCount Value="20"/>
+      </Unit0>
+      <Unit1>
+        <Filename Value="unit1.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="Form1"/>
+        <ResourceBaseClass Value="Form"/>
+        <UnitName Value="Unit1"/>
+        <TopLine Value="118"/>
+        <CursorPos X="3" Y="150"/>
+        <UsageCount Value="20"/>
+        <Loaded Value="True"/>
+        <LoadedDesigner Value="True"/>
+      </Unit1>
+      <Unit2>
+        <Filename Value="Nova pasta\webservice1.pas"/>
+        <IsVisibleTab Value="True"/>
+        <EditorIndex Value="1"/>
+        <TopLine Value="111"/>
+        <CursorPos X="59" Y="143"/>
+        <UsageCount Value="10"/>
+        <Loaded Value="True"/>
+      </Unit2>
+    </Units>
+    <JumpHistory Count="10" HistoryIndex="9">
+      <Position1>
+        <Filename Value="Nova pasta\webservice1.pas"/>
+        <Caret Line="255" Column="27" TopLine="229"/>
+      </Position1>
+      <Position2>
+        <Filename Value="Nova pasta\webservice1.pas"/>
+        <Caret Line="123" Column="53" TopLine="187"/>
+      </Position2>
+      <Position3>
+        <Filename Value="Nova pasta\webservice1.pas"/>
+        <Caret Line="124" Column="44" TopLine="106"/>
+      </Position3>
+      <Position4>
+        <Filename Value="Nova pasta\webservice1.pas"/>
+        <Caret Line="130" Column="40" TopLine="112"/>
+      </Position4>
+      <Position5>
+        <Filename Value="Nova pasta\webservice1.pas"/>
+        <Caret Line="140" Column="17" TopLine="118"/>
+      </Position5>
+      <Position6>
+        <Filename Value="unit1.pas"/>
+        <Caret Line="143" Column="50" TopLine="117"/>
+      </Position6>
+      <Position7>
+        <Filename Value="Nova pasta\webservice1.pas"/>
+        <Caret Line="216" Column="36" TopLine="197"/>
+      </Position7>
+      <Position8>
+        <Filename Value="Nova pasta\webservice1.pas"/>
+        <Caret Line="217" Column="50" TopLine="197"/>
+      </Position8>
+      <Position9>
+        <Filename Value="Nova pasta\webservice1.pas"/>
+        <Caret Line="201" Column="78" TopLine="197"/>
+      </Position9>
+      <Position10>
+        <Filename Value="unit1.pas"/>
+        <Caret Line="150" TopLine="118"/>
+      </Position10>
+    </JumpHistory>
+  </ProjectSession>
+  <Debugging>
+    <BreakPoints Count="1">
+      <Item1>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="Nova pasta\webservice1.pas"/>
+        <Line Value="278"/>
+      </Item1>
+    </BreakPoints>
+  </Debugging>
+</CONFIG>
