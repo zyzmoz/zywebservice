@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, LResources, Forms, Controls, Graphics, Dialogs,
-  blcksock, sockets, Synautil, LazLogger, fpsimplejsonexport, sqldb, strutils;
+  blcksock, sockets, Synautil, LazLogger, fpsimplejsonexport, sqldb, strutils, Windows;
 
 type
   TRoute = class(TObject)
@@ -14,21 +14,28 @@ type
     query: TSQLQuery;
   end;
 
+  TResponse = (JSON, XML, SQL);
+
   { TWebService }
   TWebService = class(TComponent)
   private
     FHost: string;
     FPort: integer;
+    FResponse: TResponse;
     procedure SetHost(AValue: string);
     procedure SetPort(AValue: integer);
+    procedure SetResponse(AValue: TResponse);
   protected
 
   published
     property Host: string read FHost write SetHost;
     property Port: integer read FPort write SetPort;
+    property Response: TResponse read FResponse write SetResponse default JSON;
   public
     constructor Create(AOwner: TComponent); override;
     procedure Start;
+    procedure Stop;
+    procedure Restart;
     procedure SetRoute(ARoute: string; AQuery: TSQLQuery);
     procedure Send(AValue: string);
 
@@ -45,6 +52,7 @@ type
     procedure SetHost(AValue: string);
     procedure SetPort(AValue: integer);
     function Get(URI: string): string;
+    function Post(URI: string; AData: string): string;
   protected
     procedure Execute; override;
   published
@@ -121,8 +129,13 @@ begin
     end
     else
     begin
-      if (trim(method) = 'get') then
+      DebugLn(method);
+      if (trim(method) = 'GET') then
         res := Get(uri);
+
+      if (trim(method) = 'POST') then
+        res := Post(uri, '');
+
       OutputDataString := res;
       // Write the headers back to the client
       ASocket.SendString('HTTP/1.0 200' + CRLF);
@@ -139,32 +152,6 @@ begin
   end
   else
     ASocket.SendString('HTTP/1.0 404' + CRLF);
-
-  // Now write the document to the output stream
-  //if uri = '/' then
-  //begin
-  //  // Write the output document to the stream
-  //  OutputDataString :=
-  //    '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"' +
-  //    ' "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">' +
-  //    CRLF + '<html><h1>Server running at: ' + Host + ':' +
-  //    IntToStr(Port) + '</h1></html>' + CRLF;
-
-  //  // Write the headers back to the client
-  //  ASocket.SendString('HTTP/1.0 200' + CRLF);
-  //  ASocket.SendString('Content-type: Text/Html' + CRLF);
-  //  ASocket.SendString('Content-length: ' + IntToStr(Length(OutputDataString)) + CRLF);
-  //  ASocket.SendString('Connection: close' + CRLF);
-  //  ASocket.SendString('Date: ' + Rfc822DateTime(now) + CRLF);
-  //  ASocket.SendString('Server: Ws Lazarus' + CRLF);
-  //  ASocket.SendString('' + CRLF);
-
-  //  // Write the document back to the browser
-  //  ASocket.SendString(OutputDataString);
-  //end
-  //else
-  //  ASocket.SendString('HTTP/1.0 404' + CRLF);
-
 end;
 
 procedure TWebServiceThread.SetHost(AValue: string);
@@ -202,7 +189,8 @@ begin
       AttendConnection(ConnectionSocket);
       ConnectionSocket.CloseSocket;
     end;
-  until False;
+  until ws.Terminated;
+  //False;
 
   ListenerSocket.Free;
   ConnectionSocket.Free;
@@ -224,12 +212,19 @@ begin
   FPort := AValue;
 end;
 
+procedure TWebService.SetResponse(AValue: TResponse);
+begin
+  if FResponse=AValue then Exit;
+  FResponse:=AValue;
+end;
+
 function TWebServiceThread.Get(URI: string): string;
 var
   I : integer;
   jsonExp: TSimpleJSONExporter;
   st: TFileStream;
   bytes: TBytes;
+  res : String;
 begin
   jsonExp := TSimpleJSONExporter.Create(nil);
   for I := 0 to Length(routes) - 1 do
@@ -239,6 +234,7 @@ begin
       jsonExp.Dataset := routes[i].query;
       jsonExp.FileName := 'data.json';
       try
+        routes[i].query.Close;
         routes[i].query.Open;
         jsonExp.Execute;
         st := TFileStream.Create('data.json', fmOpenRead or fmShareDenyWrite);
@@ -247,7 +243,35 @@ begin
           SetLength(bytes, st.Size);
           st.Read(bytes[0], st.Size);
         end;
-         Result := TEncoding.ASCII.GetString(bytes);
+        DeleteFile('data.json');
+        res := StringReplace(TEncoding.ASCII.GetString(bytes), ';', ',', [rfReplaceAll]);
+        res := StringReplace(res, #13#10, '', [rfReplaceAll]);
+        res := copy(res, 0, pos(']',res) - 2);
+        res := res + ']';
+        FreeAndNil(jsonExp);
+        FreeAndNil(st);
+        Result := res;
+      except
+        on E: Exception do
+          Result := '{error: "' + e.Message + '"}';
+      end;
+      break;
+    end;
+  end;
+end;
+
+function TWebServiceThread.Post(URI: string; AData: string): string;
+var
+  I : integer;
+  res : String;
+begin
+  for I := 0 to Length(routes) - 1 do
+  begin
+    if (routes[I].path = uri) then
+    begin
+      if (AData = '') then
+        Result := '{error: "No Records found!"}';
+      try
 
 
       except
@@ -271,6 +295,7 @@ begin
   route.query := nil;
   s_routes[Length(routes) - 1] := route.path;
   routes[Length(routes) - 1] := route;
+
 end;
 
 procedure TWebService.Start;
@@ -279,6 +304,20 @@ begin
   ws.Host := Host;
   ws.Port := Port;
   ws.Start;
+end;
+
+procedure TWebService.Stop;
+begin
+  ws.Terminate;
+  ws.WaitFor;
+  ws.Free;
+  ws := nil;
+end;
+
+procedure TWebService.Restart;
+begin
+  Stop;
+  Start;
 end;
 
 procedure TWebService.SetRoute(ARoute: string; AQuery: TSQLQuery);
