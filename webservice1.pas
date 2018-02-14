@@ -13,6 +13,10 @@ type
     path: string;
     query: TSQLQuery;
   end;
+  TFilter = class(TObject)
+    name: String;
+    value: Variant;
+  end;
 
   TResponse = (JSON, XML, SQL);
 
@@ -64,6 +68,7 @@ var
   ws: TWebServiceThread;
   ListenerSocket, ConnectionSocket: TTCPBlockSocket;
   routes: array of TRoute;
+  filters: array of TFilter;
   s_routes: array of string;
 
 procedure Register;
@@ -81,12 +86,17 @@ end;
 
 procedure TWebServiceThread.AttendConnection(ASocket: TTCPBlockSocket);
 var
-  timeout: integer;
+  timeout,i: integer;
   s, res: string;
   method, uri, protocol: string;
   OutputDataString: string;
-  ResultCode: integer;
-
+  arq: TextFile;
+  body : String;
+  filter: String;
+  filterObj : TFilter;
+  message: TStringList;
+  without_body: word;
+  content: word = 0;
 begin
   timeout := 120000;
 
@@ -94,9 +104,15 @@ begin
 
   //read request line
   s := ASocket.RecvString(timeout);
+
   DebugLn(s);
   method := fetch(s, ' ');
   uri := fetch(s, ' ');
+  if (uri.Contains('?')) then
+  begin
+    filter := copy(uri, pos('?', uri) +1 , Length(uri));
+    uri := copy(uri, 0, pos('?', uri) -1);
+  end;
   protocol := fetch(s, ' ');
 
   //read request headers
@@ -104,6 +120,18 @@ begin
     s := ASocket.RecvString(Timeout);
     DebugLn(s);
   until s = '';
+
+  if (method = 'POST') then
+  begin
+    res := ASocket.RecvPacket(timeout);
+    body := copy(res, Pos('{', res) - 1, Length(res));
+    if (body = '') then
+      body := copy(res, Pos('[', res) - 1, Length(res));
+    AssignFile(arq, 'c:/temp/headers.txt');
+    Rewrite(arq);
+    Write(arq,res);
+    Close(arq);
+  end;
 
   if (AnsiIndexStr(uri, s_routes) > -1) then
   begin
@@ -130,11 +158,14 @@ begin
     else
     begin
       DebugLn(method);
+
       if (trim(method) = 'GET') then
         res := Get(uri);
 
       if (trim(method) = 'POST') then
-        res := Post(uri, '');
+      begin
+        res := Post(uri, body);
+      end;
 
       OutputDataString := res;
       // Write the headers back to the client
@@ -173,8 +204,9 @@ begin
   ListenerSocket := TTCPBlockSocket.Create;
   ConnectionSocket := TTCPBlockSocket.Create;
 
+
   ListenerSocket.CreateSocket;
-  ListenerSocket.setLinger(True, 10);
+  ListenerSocket.setLinger(True, 1000);
   ListenerSocket.bind(Host, IntToStr(Port));
   ListenerSocket.HTTPTunnelIP := '192.168.0.12';
   ListenerSocket.HTTPTunnelPort := IntToStr(Port);
@@ -272,8 +304,7 @@ begin
       if (AData = '') then
         Result := '{error: "No Records found!"}';
       try
-
-
+        Result := AData;
       except
         on E: Exception do
           Result := '{error: "' + e.Message + '"}';
