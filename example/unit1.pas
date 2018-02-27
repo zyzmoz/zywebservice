@@ -61,7 +61,7 @@ end;
 
 procedure TForm1.FormShow(Sender: TObject);
 begin
-  WebService1.SetRoute('/lol', SQLQuery1);
+  WebService1.SetRoute('/produtos', SQLQuery1);
 end;
 
 end.

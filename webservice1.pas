@@ -55,8 +55,10 @@ type
     procedure AttendConnection(ASocket: TTCPBlockSocket);
     procedure SetHost(AValue: string);
     procedure SetPort(AValue: integer);
-    function Get(URI: string): string;
+    function Get(URI, filter: string): string;
     function Post(URI: string; AData: string): string;
+    procedure Split(Delimiter: Char; Str: String; ListOfStrings: TStrings);
+    function ParseValue(str: String): Variant;
   protected
     procedure Execute; override;
   published
@@ -93,7 +95,6 @@ var
   arq: TextFile;
   body : String;
   filter: String;
-  filterObj : TFilter;
   message: TStringList;
   without_body: word;
   content: word = 0;
@@ -108,10 +109,11 @@ begin
   DebugLn(s);
   method := fetch(s, ' ');
   uri := fetch(s, ' ');
-  if (uri.Contains('?')) then
+  filter := '';
+  if (uri.Contains('&')) then
   begin
-    filter := copy(uri, pos('?', uri) +1 , Length(uri));
-    uri := copy(uri, 0, pos('?', uri) -1);
+    filter := copy(uri, pos('&', uri) +1 , Length(uri));
+    uri := copy(uri, 0, pos('&', uri) -1);
   end;
   protocol := fetch(s, ' ');
 
@@ -160,7 +162,7 @@ begin
       DebugLn(method);
 
       if (trim(method) = 'GET') then
-        res := Get(uri);
+        res := Get(uri, filter);
 
       if (trim(method) = 'POST') then
       begin
@@ -250,23 +252,54 @@ begin
   FResponse:=AValue;
 end;
 
-function TWebServiceThread.Get(URI: string): string;
+function TWebServiceThread.Get(URI, filter: string): string;
 var
-  I : integer;
+  I, J : integer;
   jsonExp: TSimpleJSONExporter;
   st: TFileStream;
   bytes: TBytes;
-  res : String;
+  res, sql, paramField : String;
+  params : TStringList;
 begin
   jsonExp := TSimpleJSONExporter.Create(nil);
+  params := TStringList.Create;
   for I := 0 to Length(routes) - 1 do
   begin
     if (routes[I].path = uri) then
     begin
+      sql := routes[i].query.SQL.Text;
       jsonExp.Dataset := routes[i].query;
       jsonExp.FileName := 'data.json';
       try
         routes[i].query.Close;
+
+        Split('?', filter, params);
+        if (params.Count > 0) then
+        begin
+          for J := 0 to params.Count -1 do
+          begin
+            paramField := StringReplace(copy(params[J], 0, pos('=', params[J]) - 1),'?', '', [rfReplaceAll]);
+            if (paramField <> 'orderBy') then
+            begin
+              if (J = 0) then
+                routes[i].query.SQL.Add(' where ' + paramField)
+              else
+                routes[i].query.SQL.Add(' and ' + paramField);
+
+              if (params[J].Contains('=%')) then
+                routes[i].query.SQL.Add( ' containing :PAR' + IntToStr(J))
+              else
+                routes[i].query.SQL.Add( ' = :PAR' + IntToStr(J));
+
+              routes[i].query.Params[J].Value :=  ParseValue(StringReplace(copy(params[J], pos('=', params[J])+1, Length(params[J])), '%', '', [rfReplaceAll]));
+            end
+            else
+            begin
+              //Order
+
+            end;
+          end;
+        end;
         routes[i].query.Open;
         jsonExp.Execute;
         st := TFileStream.Create('data.json', fmOpenRead or fmShareDenyWrite);
@@ -279,9 +312,13 @@ begin
         res := StringReplace(TEncoding.ASCII.GetString(bytes), ';', ',', [rfReplaceAll]);
         res := StringReplace(res, #13#10, '', [rfReplaceAll]);
         res := copy(res, 0, pos(']',res) - 2);
+        if (res = '') then
+          res := res + '[';
         res := res + ']';
         FreeAndNil(jsonExp);
         FreeAndNil(st);
+        routes[i].query.Close;
+        routes[i].query.SQL.Text := sql;
         Result := res;
       except
         on E: Exception do
@@ -314,6 +351,29 @@ begin
   end;
 end;
 
+procedure TWebServiceThread.Split(Delimiter: Char; Str: String;
+  ListOfStrings: TStrings);
+begin
+  ListOfStrings.Clear;
+  ListOfStrings.Delimiter       := Delimiter;
+  ListOfStrings.StrictDelimiter := True;
+  ListOfStrings.DelimitedText   := Str;
+end;
+
+function TWebServiceThread.ParseValue(str: String): Variant;
+var
+  int : Integer;
+begin
+  try
+    int := StrToInt(str);
+    Result := int;
+  except
+  end;
+
+  Result := str ;
+
+end;
+
 constructor TWebService.Create(AOwner: TComponent);
 var
   route: TRoute;
@@ -339,10 +399,13 @@ end;
 
 procedure TWebService.Stop;
 begin
-  ws.Terminate;
-  ws.WaitFor;
-  ws.Free;
-  ws := nil;
+  if (ws <> nil) then
+  begin
+    ws.Terminate;
+    ws.WaitFor;
+    ws.Free;
+    ws := nil;
+  end;
 end;
 
 procedure TWebService.Restart;
