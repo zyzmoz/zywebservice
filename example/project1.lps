@@ -3,7 +3,7 @@
   <ProjectSession>
     <PathDelim Value="\"/>
     <Version Value="10"/>
-    <BuildModes Active="Debug"/>
+    <BuildModes Active="Release"/>
     <Units Count="6">
       <Unit0>
         <Filename Value="project1.lpr"/>
@@ -37,8 +37,8 @@
         <Filename Value="..\webservice1.pas"/>
         <IsVisibleTab Value="True"/>
         <EditorIndex Value="2"/>
-        <TopLine Value="404"/>
-        <CursorPos X="11" Y="426"/>
+        <TopLine Value="392"/>
+        <CursorPos X="64" Y="402"/>
         <UsageCount Value="21"/>
         <Loaded Value="True"/>
       </Unit3>
