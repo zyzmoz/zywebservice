@@ -47,11 +47,13 @@ implementation
 procedure TForm1.Button1Click(Sender: TObject);
 begin
   WebService1.Start;
+  CheckBox1.Checked:= WebService1.isActive();
 end;
 
 procedure TForm1.Button2Click(Sender: TObject);
 begin
   WebService1.Stop;
+  CheckBox1.Checked:= WebService1.isActive();
 end;
 
 procedure TForm1.ComboBox1Change(Sender: TObject);

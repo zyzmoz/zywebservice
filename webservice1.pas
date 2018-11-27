@@ -42,6 +42,7 @@ type
     procedure Restart;
     procedure SetRoute(ARoute: string; AQuery: TSQLQuery);
     procedure Send(AValue: string);
+    function isActive(): boolean;
 
 
   end;
@@ -129,7 +130,7 @@ begin
     body := copy(res, Pos('{', res) - 1, Length(res));
     if (body = '') then
       body := copy(res, Pos('[', res) - 1, Length(res));
-    AssignFile(arq, 'c:/temp/headers.txt');
+    AssignFile(arq, 'headers.txt');
     Rewrite(arq);
     Write(arq,res);
     Close(arq);
@@ -258,7 +259,7 @@ var
   jsonExp: TSimpleJSONExporter;
   st: TFileStream;
   bytes: TBytes;
-  res, sql, paramField : String;
+  res, sql, paramField, orderBy : String;
   params : TStringList;
 begin
   jsonExp := TSimpleJSONExporter.Create(nil);
@@ -279,7 +280,7 @@ begin
           for J := 0 to params.Count -1 do
           begin
             paramField := StringReplace(copy(params[J], 0, pos('=', params[J]) - 1),'?', '', [rfReplaceAll]);
-            if (paramField <> 'orderBy') then
+            if ((paramField <> 'orderBy') and  (paramField <> 'desc')) then
             begin
               if (J = 0) then
                 routes[i].query.SQL.Add(' where ' + paramField)
@@ -295,11 +296,17 @@ begin
             end
             else
             begin
-              //Order
+              if (paramField = 'orderBy') then
+                orderBy :=  ' order by ' + copy(params[J], pos('=', params[J])+1, Length(params[J]));
+
+              if ((orderBy <> '') and (paramField = 'desc')) then
+                orderBy := orderBy + ' desc';
 
             end;
           end;
+          routes[i].query.SQL.Add(orderBy);
         end;
+
         routes[i].query.Open;
         jsonExp.Execute;
         st := TFileStream.Create('data.json', fmOpenRead or fmShareDenyWrite);
@@ -322,7 +329,10 @@ begin
         Result := res;
       except
         on E: Exception do
+        begin
           Result := '{error: "' + e.Message + '"}';
+          routes[i].query.SQL.Text := sql;
+        end;
       end;
       break;
     end;
@@ -332,7 +342,6 @@ end;
 function TWebServiceThread.Post(URI: string; AData: string): string;
 var
   I : integer;
-  res : String;
 begin
   for I := 0 to Length(routes) - 1 do
   begin
@@ -362,15 +371,23 @@ end;
 
 function TWebServiceThread.ParseValue(str: String): Variant;
 var
-  int : Integer;
+  I : Integer;
+  isInteger: boolean;
 begin
-  try
-    int := StrToInt(str);
-    Result := int;
-  except
+  isInteger := true;
+  for I := 0 to length(str) - 1 do
+  begin
+    if not (str[I] in ['0'..'9']) then
+    begin
+      isInteger := false;
+      break;
+    end;
   end;
 
-  Result := str ;
+  if (isInteger) then
+    Result := StrToInt(str)
+  else
+    Result := str;
 
 end;
 
@@ -401,10 +418,13 @@ procedure TWebService.Stop;
 begin
   if (ws <> nil) then
   begin
-    ws.Terminate;
-    ws.WaitFor;
-    ws.Free;
-    ws := nil;
+    try
+      ws.Terminate;
+      ws.WaitFor;
+      ws.Free;
+      ws := nil;
+    except
+    end;
   end;
 end;
 
@@ -464,6 +484,11 @@ begin
 
   except
   end;
+end;
+
+function TWebService.isActive(): boolean;
+begin
+  Result := not ws.Finished;
 end;
 
 end.

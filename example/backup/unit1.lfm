@@ -1,0 +1,161 @@
+object Form1: TForm1
+  Left = 0
+  Height = 240
+  Top = 0
+  Width = 320
+  ActiveControl = Button1
+  Caption = 'Form1'
+  ClientHeight = 240
+  ClientWidth = 320
+  OnShow = FormShow
+  Visible = False
+  object Button1: TButton
+    Left = 232
+    Height = 25
+    Top = 8
+    Width = 75
+    Caption = 'Start'
+    OnClick = Button1Click
+    TabOrder = 0
+  end
+  object CheckBox1: TCheckBox
+    Left = 16
+    Height = 19
+    Top = 16
+    Width = 88
+    Caption = 'Server Active'
+    Enabled = False
+    TabOrder = 1
+  end
+  object Button2: TButton
+    Left = 232
+    Height = 25
+    Top = 42
+    Width = 75
+    Caption = 'Stop'
+    OnClick = Button2Click
+    TabOrder = 2
+  end
+  object WebService1: TWebService
+    Host = '192.168.0.12'
+    Port = 8080
+    left = 192
+    top = 90
+  end
+  object SQLQuery1: TSQLQuery
+    FieldDefs = <    
+      item
+        Name = 'DESCRIPTION'
+        DataType = ftString
+        Precision = -1
+        Size = 60
+      end    
+      item
+        Name = 'EAN'
+        DataType = ftString
+        Precision = -1
+        Size = 15
+      end    
+      item
+        Name = 'VALUE'
+        DataType = ftFloat
+        Precision = -1
+      end    
+      item
+        Name = 'GROUP'
+        DataType = ftInteger
+        Precision = -1
+      end    
+      item
+        Name = 'PIZZA'
+        DataType = ftInteger
+        Precision = -1
+      end>
+    Database = IBConnection1
+    Transaction = SQLTransaction1
+    SQL.Strings = (
+      'select'
+      '    coalesce(p.descricao,'''') as description,'
+      '    coalesce(p.codbarras,'''') as ean,'
+      '    coalesce(p.valorvenda, 0) as "VALUE",'
+      '    coalesce(p.codgrupo, 0) as "GROUP",'
+      '    0 as PIZZA'
+      'from produtos p'
+      ''
+      ''
+      ''
+    )
+    Params = <>
+    left = 123
+    top = 55
+    object SQLQuery1DESCRIPTION: TStringField
+      FieldKind = fkData
+      FieldName = 'DESCRIPTION'
+      Index = 0
+      LookupCache = False
+      ProviderFlags = [pfInUpdate, pfInWhere]
+      ReadOnly = False
+      Required = False
+      Size = 60
+    end
+    object SQLQuery1EAN: TStringField
+      FieldKind = fkData
+      FieldName = 'EAN'
+      Index = 1
+      LookupCache = False
+      ProviderFlags = [pfInUpdate, pfInWhere]
+      ReadOnly = False
+      Required = True
+      Size = 15
+    end
+    object SQLQuery1VALUE: TFloatField
+      FieldKind = fkData
+      FieldName = 'VALUE'
+      Index = 2
+      LookupCache = False
+      ProviderFlags = [pfInUpdate, pfInWhere]
+      ReadOnly = False
+      Required = False
+      MaxValue = 0
+      MinValue = 0
+      Precision = -1
+    end
+    object SQLQuery1GROUP: TLongintField
+      FieldKind = fkData
+      FieldName = 'GROUP'
+      Index = 3
+      LookupCache = False
+      ProviderFlags = [pfInUpdate, pfInWhere]
+      ReadOnly = False
+      Required = False
+    end
+    object SQLQuery1PIZZA: TLongintField
+      FieldKind = fkData
+      FieldName = 'PIZZA'
+      Index = 4
+      LookupCache = False
+      ProviderFlags = [pfInUpdate, pfInWhere]
+      ReadOnly = False
+      Required = True
+    end
+  end
+  object IBConnection1: TIBConnection
+    Connected = True
+    LoginPrompt = False
+    DatabaseName = 'C:\sgsuper\DBCOMP.FDB'
+    KeepConnection = False
+    Password = 'masterkey'
+    Transaction = SQLTransaction1
+    UserName = 'SYSDBA'
+    HostName = 'localhost'
+    CheckTransactionParams = False
+    left = 72
+    top = 140
+  end
+  object SQLTransaction1: TSQLTransaction
+    Active = True
+    Database = IBConnection1
+    left = 143
+    top = 182
+  end
+end
