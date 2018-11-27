@@ -71,6 +71,7 @@ object Form1: TForm1
         DataType = ftInteger
         Precision = -1
       end>
+    AfterCancel = SQLQuery1AfterCancel
     Database = IBConnection1
     Transaction = SQLTransaction1
     SQL.Strings = (

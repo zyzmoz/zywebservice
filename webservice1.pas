@@ -9,9 +9,12 @@ uses
   blcksock, sockets, Synautil, LazLogger, fpsimplejsonexport, sqldb, strutils, Windows;
 
 type
+  TBodyHandler = function(const body : String): string;
+
   TRoute = class(TObject)
     path: string;
     query: TSQLQuery;
+    action: TBodyHandler
   end;
   TFilter = class(TObject)
     name: String;
@@ -19,6 +22,8 @@ type
   end;
 
   TResponse = (JSON, XML, SQL);
+
+
 
   { TWebService }
   TWebService = class(TComponent)
@@ -35,6 +40,7 @@ type
     property Host: string read FHost write SetHost;
     property Port: integer read FPort write SetPort;
     property Response: TResponse read FResponse write SetResponse default JSON;
+
   public
     constructor Create(AOwner: TComponent); override;
     procedure Start;
@@ -57,7 +63,8 @@ type
     procedure SetHost(AValue: string);
     procedure SetPort(AValue: integer);
     function Get(URI, filter: string): string;
-    function Post(URI: string; AData: string): string;
+    function Post(URI: string; AData: string): string; overload;
+    function Post(URI: string; AData: string; f: TBodyHandler ): string; overload;
     procedure Split(Delimiter: Char; Str: String; ListOfStrings: TStrings);
     function ParseValue(str: String): Variant;
   protected
@@ -207,11 +214,10 @@ begin
   ListenerSocket := TTCPBlockSocket.Create;
   ConnectionSocket := TTCPBlockSocket.Create;
 
-
   ListenerSocket.CreateSocket;
   ListenerSocket.setLinger(True, 1000);
   ListenerSocket.bind(Host, IntToStr(Port));
-  ListenerSocket.HTTPTunnelIP := '192.168.0.12';
+  ListenerSocket.HTTPTunnelIP := Host;
   ListenerSocket.HTTPTunnelPort := IntToStr(Port);
   ListenerSocket.listen;
 
@@ -224,13 +230,12 @@ begin
       AttendConnection(ConnectionSocket);
       ConnectionSocket.CloseSocket;
     end;
-  until ws.Terminated;
+  until ws.Finished;
   //False;
-
   ListenerSocket.Free;
   ConnectionSocket.Free;
-end;
 
+end;
 
 
 procedure TWebService.SetHost(AValue: string);
@@ -252,6 +257,7 @@ begin
   if FResponse=AValue then Exit;
   FResponse:=AValue;
 end;
+
 
 function TWebServiceThread.Get(URI, filter: string): string;
 var
@@ -360,6 +366,12 @@ begin
   end;
 end;
 
+function TWebServiceThread.Post(URI: string; AData: string; f: TBodyHandler
+  ): string;
+begin
+  f(AData);
+end;
+
 procedure TWebServiceThread.Split(Delimiter: Char; Str: String;
   ListOfStrings: TStrings);
 begin
@@ -418,13 +430,13 @@ procedure TWebService.Stop;
 begin
   if (ws <> nil) then
   begin
-    try
-      ws.Terminate;
-      ws.WaitFor;
-      ws.Free;
-      ws := nil;
-    except
-    end;
+    ws.Terminate;
+    //
+    //while not ws.Terminated do;
+    //begin
+    //  TerminateThread(ws.Handle,0);
+    //end;
+
   end;
 end;
 

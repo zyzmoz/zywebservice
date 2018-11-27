@@ -29,6 +29,7 @@ type
     procedure Button2Click(Sender: TObject);
     procedure ComboBox1Change(Sender: TObject);
     procedure FormShow(Sender: TObject);
+    procedure SQLQuery1AfterCancel(DataSet: TDataSet);
   private
 
   public
@@ -53,6 +54,7 @@ end;
 procedure TForm1.Button2Click(Sender: TObject);
 begin
   WebService1.Stop;
+  CheckBox1.Checked:= WebService1.isActive();
 end;
 
 procedure TForm1.ComboBox1Change(Sender: TObject);
@@ -63,6 +65,11 @@ end;
 procedure TForm1.FormShow(Sender: TObject);
 begin
   WebService1.SetRoute('/produtos', SQLQuery1);
+end;
+
+procedure TForm1.SQLQuery1AfterCancel(DataSet: TDataSet);
+begin
+
 end;
 
 end.
