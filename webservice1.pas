@@ -6,23 +6,24 @@ interface
 
 uses
   Classes, SysUtils, LResources, Forms, Controls, Graphics, Dialogs,
-  blcksock, sockets, Synautil, LazLogger, fpsimplejsonexport, sqldb, strutils, Windows;
+  blcksock, sockets, Synautil, LazLogger, fpsimplejsonexport, fpjson,
+  sqldb, strutils, Windows;
 
 type
-  TBodyHandler = function(const body : String): string;
+  TAction = (acInsert, acSelect, acUpdate, acDelete);
 
   TRoute = class(TObject)
     path: string;
     query: TSQLQuery;
-    action: TBodyHandler
+    action: TAction;
   end;
+
   TFilter = class(TObject)
-    name: String;
-    value: Variant;
+    Name: string;
+    Value: variant;
   end;
 
   TResponse = (JSON, XML, SQL);
-
 
 
   { TWebService }
@@ -46,7 +47,7 @@ type
     procedure Start;
     procedure Stop;
     procedure Restart;
-    procedure SetRoute(ARoute: string; AQuery: TSQLQuery);
+    procedure SetRoute(ARoute: string; AQuery: TSQLQuery; AAction: TAction = acSelect);
     procedure Send(AValue: string);
     function isActive(): boolean;
 
@@ -64,9 +65,8 @@ type
     procedure SetPort(AValue: integer);
     function Get(URI, filter: string): string;
     function Post(URI: string; AData: string): string; overload;
-    function Post(URI: string; AData: string; f: TBodyHandler ): string; overload;
-    procedure Split(Delimiter: Char; Str: String; ListOfStrings: TStrings);
-    function ParseValue(str: String): Variant;
+    procedure Split(Delimiter: char; Str: string; ListOfStrings: TStrings);
+    function ParseValue(str: string): variant;
   protected
     procedure Execute; override;
   published
@@ -96,13 +96,13 @@ end;
 
 procedure TWebServiceThread.AttendConnection(ASocket: TTCPBlockSocket);
 var
-  timeout,i: integer;
+  timeout, i: integer;
   s, res: string;
   method, uri, protocol: string;
   OutputDataString: string;
   arq: TextFile;
-  body : String;
-  filter: String;
+  body: string;
+  filter: string;
   message: TStringList;
   without_body: word;
   content: word = 0;
@@ -120,8 +120,8 @@ begin
   filter := '';
   if (uri.Contains('&')) then
   begin
-    filter := copy(uri, pos('&', uri) +1 , Length(uri));
-    uri := copy(uri, 0, pos('&', uri) -1);
+    filter := copy(uri, pos('&', uri) + 1, Length(uri));
+    uri := copy(uri, 0, pos('&', uri) - 1);
   end;
   protocol := fetch(s, ' ');
 
@@ -139,7 +139,7 @@ begin
       body := copy(res, Pos('[', res) - 1, Length(res));
     AssignFile(arq, 'headers.txt');
     Rewrite(arq);
-    Write(arq,res);
+    Write(arq, res);
     Close(arq);
   end;
 
@@ -254,19 +254,20 @@ end;
 
 procedure TWebService.SetResponse(AValue: TResponse);
 begin
-  if FResponse=AValue then Exit;
-  FResponse:=AValue;
+  if FResponse = AValue then
+    Exit;
+  FResponse := AValue;
 end;
 
 
 function TWebServiceThread.Get(URI, filter: string): string;
 var
-  I, J : integer;
+  I, J: integer;
   jsonExp: TSimpleJSONExporter;
   st: TFileStream;
   bytes: TBytes;
-  res, sql, paramField, orderBy : String;
-  params : TStringList;
+  res, sql, paramField, orderBy: string;
+  params: TStringList;
 begin
   jsonExp := TSimpleJSONExporter.Create(nil);
   params := TStringList.Create;
@@ -283,10 +284,11 @@ begin
         Split('?', filter, params);
         if (params.Count > 0) then
         begin
-          for J := 0 to params.Count -1 do
+          for J := 0 to params.Count - 1 do
           begin
-            paramField := StringReplace(copy(params[J], 0, pos('=', params[J]) - 1),'?', '', [rfReplaceAll]);
-            if ((paramField <> 'orderBy') and  (paramField <> 'desc')) then
+            paramField := StringReplace(copy(params[J], 0, pos('=', params[J]) - 1),
+              '?', '', [rfReplaceAll]);
+            if ((paramField <> 'orderBy') and (paramField <> 'desc')) then
             begin
               if (J = 0) then
                 routes[i].query.SQL.Add(' where ' + paramField)
@@ -294,16 +296,19 @@ begin
                 routes[i].query.SQL.Add(' and ' + paramField);
 
               if (params[J].Contains('=%')) then
-                routes[i].query.SQL.Add( ' containing :PAR' + IntToStr(J))
+                routes[i].query.SQL.Add(' containing :PAR' + IntToStr(J))
               else
-                routes[i].query.SQL.Add( ' = :PAR' + IntToStr(J));
+                routes[i].query.SQL.Add(' = :PAR' + IntToStr(J));
 
-              routes[i].query.Params[J].Value :=  ParseValue(StringReplace(copy(params[J], pos('=', params[J])+1, Length(params[J])), '%', '', [rfReplaceAll]));
+              routes[i].query.Params[J].Value :=
+                ParseValue(StringReplace(copy(params[J], pos('=', params[J]) +
+                1, Length(params[J])), '%', '', [rfReplaceAll]));
             end
             else
             begin
               if (paramField = 'orderBy') then
-                orderBy :=  ' order by ' + copy(params[J], pos('=', params[J])+1, Length(params[J]));
+                orderBy := ' order by ' +
+                  copy(params[J], pos('=', params[J]) + 1, Length(params[J]));
 
               if ((orderBy <> '') and (paramField = 'desc')) then
                 orderBy := orderBy + ' desc';
@@ -314,7 +319,9 @@ begin
         end;
 
         routes[i].query.Open;
+        jsonExp.FormatSettings.ColumnFormat := TJSONColumnFormat(cfObject);
         jsonExp.Execute;
+        res := jsonExp.ToString;
         st := TFileStream.Create('data.json', fmOpenRead or fmShareDenyWrite);
         if (st.Size > 0) then
         begin
@@ -324,7 +331,7 @@ begin
         DeleteFile('data.json');
         res := StringReplace(TEncoding.ASCII.GetString(bytes), ';', ',', [rfReplaceAll]);
         res := StringReplace(res, #13#10, '', [rfReplaceAll]);
-        res := copy(res, 0, pos(']',res) - 2);
+        res := copy(res, 0, pos(']', res) - 2);
         if (res = '') then
           res := res + '[';
         res := res + ']';
@@ -347,8 +354,14 @@ end;
 
 function TWebServiceThread.Post(URI: string; AData: string): string;
 var
-  I : integer;
+  I, F: integer;
+  jData: TJSONData;
+  JSON: TJSONObject;
+  auxSql, where: string;
 begin
+  jData := GetJSON(AData);
+  JSON := TJSONObject(jData);
+
   for I := 0 to Length(routes) - 1 do
   begin
     if (routes[I].path = uri) then
@@ -356,7 +369,93 @@ begin
       if (AData = '') then
         Result := '{error: "No Records found!"}';
       try
-        Result := AData;
+        case routes[I].action of
+          acDelete:
+          begin
+            with routes[I] do
+            begin
+              try
+                where := JSON.Get('where');
+              except
+                Result := '{error: "No where clause for delete method"}';
+                Exit;
+              end;
+
+              auxSql := query.SQL.Text;
+              if auxSql.Contains('where') then
+                query.SQL.Add(' and ' + JSON.Get('where'))
+              else
+                query.SQL.Add(' where ' + JSON.Get('where'));
+              query.Open;
+
+              if (query.IsEmpty) then
+              begin
+                Result := '{error: "Record not found"}';
+                Exit;
+              end;
+
+              query.Delete;
+
+              (query.Transaction as TSQLTransaction).Commit;
+              query.SQL.Text := auxSql;
+              Result := '{action: "Delete", error: false}';
+            end;
+          end;
+          acInsert:
+          begin
+            with routes[I] do
+            begin
+              query.Open;
+              query.Insert;
+              for F := 0 to query.FieldCount - 1 do
+                query.Fields[F].Value := JSON.Get(LowerCase(query.Fields[F].FieldName));
+
+              query.Post;
+              query.ApplyUpdates();
+              (query.Transaction as TSQLTransaction).Commit;
+              Result := '{action: "Insert", error: false}';
+            end;
+          end;
+          acUpdate:
+          begin
+            with routes[I] do
+            begin
+              try
+                where := JSON.Get('where');
+              except
+                Result := '{error: "No where clause for update method"}';
+                Exit;
+              end;
+
+              auxSql := query.SQL.Text;
+              if auxSql.Contains('where') then
+                query.SQL.Add(' and ' + JSON.Get('where'))
+              else
+                query.SQL.Add(' where ' + JSON.Get('where'));
+              query.Open;
+
+              if (query.IsEmpty) then
+              begin
+                Result := '{error: "Record not found"}';
+                Exit;
+              end;
+
+              query.Edit;
+              for F := 0 to query.FieldCount - 1 do
+                query.Fields[F].Value := JSON.Get(LowerCase(query.Fields[F].FieldName));
+
+              query.Post;
+              query.ApplyUpdates();
+              (query.Transaction as TSQLTransaction).Commit;
+              query.SQL.Text := auxSql;
+              Result := '{action: "Update", error: false}';
+            end;
+          end;
+          else
+            Result := '{error: "No Action Assigned!"}';
+        end;
+
+        //Result := AData;
       except
         on E: Exception do
           Result := '{error: "' + e.Message + '"}';
@@ -366,32 +465,27 @@ begin
   end;
 end;
 
-function TWebServiceThread.Post(URI: string; AData: string; f: TBodyHandler
-  ): string;
-begin
-  f(AData);
-end;
 
-procedure TWebServiceThread.Split(Delimiter: Char; Str: String;
+procedure TWebServiceThread.Split(Delimiter: char; Str: string;
   ListOfStrings: TStrings);
 begin
   ListOfStrings.Clear;
-  ListOfStrings.Delimiter       := Delimiter;
+  ListOfStrings.Delimiter := Delimiter;
   ListOfStrings.StrictDelimiter := True;
-  ListOfStrings.DelimitedText   := Str;
+  ListOfStrings.DelimitedText := Str;
 end;
 
-function TWebServiceThread.ParseValue(str: String): Variant;
+function TWebServiceThread.ParseValue(str: string): variant;
 var
-  I : Integer;
+  I: integer;
   isInteger: boolean;
 begin
-  isInteger := true;
+  isInteger := True;
   for I := 0 to length(str) - 1 do
   begin
     if not (str[I] in ['0'..'9']) then
     begin
-      isInteger := false;
+      isInteger := False;
       break;
     end;
   end;
@@ -431,7 +525,7 @@ begin
   if (ws <> nil) then
   begin
     ws.Terminate;
-    //
+
     //while not ws.Terminated do;
     //begin
     //  TerminateThread(ws.Handle,0);
@@ -446,19 +540,22 @@ begin
   Start;
 end;
 
-procedure TWebService.SetRoute(ARoute: string; AQuery: TSQLQuery);
+procedure TWebService.SetRoute(ARoute: string; AQuery: TSQLQuery;
+  AAction: TAction = acSelect);
 var
   route: TRoute;
 begin
   route := TRoute.Create;
   route.path := ARoute;
   route.query := AQuery;
+  route.action := AAction;
   SetLength(routes, Length(routes) + 1);
   SetLength(s_routes, Length(routes));
   s_routes[Length(routes) - 1] := route.path;
   routes[Length(routes) - 1] := route;
 
 end;
+
 
 procedure TWebService.Send(AValue: string);
 var
