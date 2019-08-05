@@ -319,7 +319,7 @@ begin
         end;
 
         routes[i].query.Open;
-        jsonExp.FormatSettings.ColumnFormat := TJSONColumnFormat(cfObject);
+        jsonExp.FormatSettings.ColumnFormat := TJSONColumnFormat(cfObject,cfObject);
         jsonExp.Execute;
         res := jsonExp.ToString;
         st := TFileStream.Create('data.json', fmOpenRead or fmShareDenyWrite);
